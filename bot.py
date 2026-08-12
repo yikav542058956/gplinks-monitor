@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
 📱 GPLinks Monitor Bot v4.1 — FORWARD ANY USER MESSAGE TO TARGET CHAT
-- Koi bhi user bot ko message bheje (link ya kuch bhi)
-- Bot us message ko directly chat 8226002644 mein forward kar dega
-- Poora text + link jaise ka taisa copy hoga
-- Admin /login se monitoring bhi start kar sakta hai
+- Koi bhi user bot ko message bheje → bot TARGET_CHAT_ID mein forward karega
+- Plain text forward (no HTML parse errors)
+- Admin /login → Phone → OTP → 2FA → Monitor ON
 """
 
 import asyncio, logging, os, re, time
@@ -43,26 +42,18 @@ def is_dest(url):
     return not any(dom == s or dom.endswith("."+s) for s in skip)
 
 
-# ═══════════ FORWARD: ANY USER → TARGET CHAT ═══════════
-
-async def forward_to_target(update, ctx):
-    """ANY message from ANY user (except during login) → forward to TARGET_CHAT_ID"""
+async def forward_to_target(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     text = update.message.text or update.message.caption or ""
     if not text.strip():
         return
-    fwd = f"📩 <b>User:</b> {user.first_name} (@{user.username or 'N/A'}) [<code>{user.id}</code>]\n💬 <b>Message:</b>\n{text}"
+    fwd = f"📩 {user.first_name} (@{user.username or 'N/A'}) [{user.id}]\n\n💬 {text}"
     try:
-        await ctx.bot.send_message(TARGET_CHAT_ID, fwd, parse_mode=ParseMode.HTML)
-        logger.info(f"✅ Forwarded {user.id} → {TARGET_CHAT_ID}")
-    except:
-        try:
-            plain = f"📩 User: {user.first_name} (@{user.username or 'N/A'}) [{user.id}]\n💬 Message:\n{text}"
-            await ctx.bot.send_message(TARGET_CHAT_ID, plain)
-        except: pass
+        await ctx.bot.send_message(TARGET_CHAT_ID, fwd)
+        logger.info(f"✅ Forwarded user {user.id} → chat {TARGET_CHAT_ID}")
+    except Exception as e:
+        logger.error(f"❌ Forward failed: {e}")
 
-
-# ═══════════ ADMIN / START ═══════════
 
 async def cmd_start(update, ctx):
     uid = update.effective_user.id
@@ -82,8 +73,6 @@ async def cmd_start(update, ctx):
         parse_mode=ParseMode.HTML
     )
 
-
-# ═══════════ LOGIN ═══════════
 
 async def login_start(update, ctx):
     if update.effective_user.id != ADMIN_ID: return ConversationHandler.END
@@ -166,8 +155,6 @@ async def login_cancel(update, ctx):
     return ConversationHandler.END
 
 
-# ═══════════ MONITOR ═══════════
-
 async def run_monitor(session_str, ctx):
     global monitor_running
     from telethon import TelegramClient, events
@@ -206,8 +193,6 @@ async def run_monitor(session_str, ctx):
         await asyncio.sleep(1)
 
 
-# ═══════════ COMMANDS ═══════════
-
 async def cmd_status(update, ctx):
     if update.effective_user.id != ADMIN_ID: return
     await update.message.reply_text(f"📊 Monitor: {'🟢' if monitor_running else '🔴'}\n🔗 {len(processed_links)}", parse_mode=ParseMode.HTML)
@@ -218,8 +203,6 @@ async def cmd_stop(update, ctx):
     monitor_running = False
     await update.message.reply_text("⏹️ Stopped.", parse_mode=ParseMode.HTML)
 
-
-# ═══════════ MAIN ═══════════
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
